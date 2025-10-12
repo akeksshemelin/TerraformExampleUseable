@@ -1,0 +1,36 @@
+# --- Auth ---
+auth_method = "sa"                       # или "oauth"
+# yc_token = "y0_AQAAA...paste..."       # если oauth
+service_account_key_file = "~/.config/yandex-cloud/sa-key.json"
+
+yc_cloud_id  = "b1gxxxxxxxxxxxxxxxxx"
+yc_folder_id = "b1fyyyyyyyyyyyyyyyyy"
+
+# --- Network ---
+zone        = "ru-central1-a"
+vpc_name    = "vpc-main"
+subnet_cidr = "10.10.0.0/24"
+
+# --- Image & SSH ---
+image_family        = "ubuntu-2204-lts"
+ssh_username        = "ubuntu"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# --- Security Group ---
+ingress_cidrs      = ["0.0.0.0/0"]  # ограничь своими подсетями в бою
+ingress_tcp_ports  = [80, 443]      # SSH 22 добавится автоматически
+
+# --- Defaults for VMs ---
+platform_id   = "standard-v3"
+cores         = 2
+memory_gb     = 2
+disk_size_gb  = 20
+preemptible   = false
+public_ip_type = "ephemeral"        # none | ephemeral | static
+
+# --- Масштабирование: набор ВМ ---
+vms = {
+  app-1 = {}                        # возьмёт дефолты
+  app-2 = { cores = 4, memory_gb = 4, public_ip_type = "none" }
+  web-1 = { disk_size_gb = 40, public_ip_type = "static" }
+}
