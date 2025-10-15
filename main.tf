@@ -3,7 +3,7 @@ terraform {
   required_providers {
     yandex = {
       source  = "yandex-cloud/yandex"
-      version = "~> 0.120"
+      version = "~> 0.164"
     }
   }
 }
@@ -13,12 +13,11 @@ provider "yandex" {
   folder_id = var.yc_folder_id
   zone      = var.zone
 
-  # Выбираем конкретный способ аутентификации
   token                    = var.auth_method == "oauth" ? var.yc_token : null
   service_account_key_file = var.auth_method == "sa"    ? var.service_account_key_file : null
 }
 
-# ----- Сеть -----
+# Network
 resource "yandex_vpc_network" "this" {
   name = var.vpc_name
 }
@@ -30,19 +29,16 @@ resource "yandex_vpc_subnet" "this" {
   v4_cidr_blocks = [var.subnet_cidr]
 }
 
-# ----- Security Group -----
+# Security Group
 resource "yandex_vpc_security_group" "this" {
   name       = "sg-main"
   network_id = yandex_vpc_network.this.id
 
-  # Разрешаем исходящий трафик везде
   egress {
     protocol       = "ANY"
-    description    = "Any egress"
     v4_cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # SSH всегда
   ingress {
     description    = "SSH"
     protocol       = "TCP"
@@ -50,7 +46,6 @@ resource "yandex_vpc_security_group" "this" {
     v4_cidr_blocks = var.ingress_cidrs
   }
 
-  # Дополнительные TCP-порты из списка
   dynamic "ingress" {
     for_each = var.ingress_tcp_ports
     content {
@@ -62,30 +57,44 @@ resource "yandex_vpc_security_group" "this" {
   }
 }
 
-# Образ по семейству
+# Image by family
 data "yandex_compute_image" "os_image" {
   family = var.image_family
 }
 
-# ----- Массовое создание ВМ -----
+# Scalable VMs
 module "vm" {
   source   = "./modules/vm"
   for_each = var.vms
 
-  name        = "vm-${each.key}"
-  zone        = var.zone
-  subnet_id   = yandex_vpc_subnet.this.id
-  sg_ids      = [yandex_vpc_security_group.this.id]
+  name                 = "vm-${each.key}"
+  zone                 = var.zone
+  subnet_id            = yandex_vpc_subnet.this.id
+  sg_ids               = [yandex_vpc_security_group.this.id]
 
-  platform_id = var.platform_id
-  cores       = coalesce(lookup(each.value, "cores", null), var.cores)
-  memory_gb   = coalesce(lookup(each.value, "memory_gb", null), var.memory_gb)
-  disk_size_gb= coalesce(lookup(each.value, "disk_size_gb", null), var.disk_size_gb)
-  preemptible = coalesce(lookup(each.value, "preemptible", null), var.preemptible)
+  platform_id          = var.platform_id
+  cores                = coalesce(lookup(each.value, "cores", null), var.cores)
+  memory_gb            = coalesce(lookup(each.value, "memory_gb", null), var.memory_gb)
+  disk_size_gb         = coalesce(lookup(each.value, "disk_size_gb", null), var.disk_size_gb)
+  preemptible          = coalesce(lookup(each.value, "preemptible", null), var.preemptible)
 
-  image_id    = data.yandex_compute_image.os_image.id
-  ssh_username= var.ssh_username
-  ssh_public_key_path = var.ssh_public_key_path
+  image_id             = data.yandex_compute_image.os_image.id
+  ssh_username         = var.ssh_username
+  ssh_public_key_path  = var.ssh_public_key_path
 
-  public_ip_type = coalesce(lookup(each.value, "public_ip_type", null), var.public_ip_type)
+  public_ip_type       = coalesce(lookup(each.value, "public_ip_type", null), var.public_ip_type)
+}
+
+output "network_id" { value = yandex_vpc_network.this.id }
+output "subnet_id"  { value = yandex_vpc_subnet.this.id }
+
+output "vm_info" {
+  value = {
+    for k, m in module.vm :
+    k => {
+      internal_ip = m.internal_ip
+      public_ip   = m.public_ip
+      fqdn        = m.fqdn
+    }
+  }
 }

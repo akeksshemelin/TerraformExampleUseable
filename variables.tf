@@ -16,9 +16,9 @@ variable "yc_token" {
 }
 
 variable "service_account_key_file" {
-  description = "Путь к service account key JSON (если auth_method = sa)"
+  description = "Путь к service account key JSON (если auth_method = sa). Указывайте абсолютный путь."
   type        = string
-  default     = "~/.config/yandex-cloud/sa-key.json"
+  default     = "/home/USER/.config/yandex-cloud/sa-key.json"
 }
 
 variable "yc_cloud_id" { type = string }
@@ -51,11 +51,11 @@ variable "ssh_username" {
 }
 
 variable "ssh_public_key_path" {
-  type    = string
-  default = "~/.ssh/id_rsa.pub"
+  description = "Абсолютный путь к публичному SSH ключу (*.pub)"
+  type        = string
+  default     = "/home/USER/.ssh/id_ed25519.pub"
 }
 
-# --- Security Group ---
 variable "ingress_cidrs" {
   description = "Список CIDR, откуда разрешён вход"
   type        = list(string)
@@ -63,41 +63,53 @@ variable "ingress_cidrs" {
 }
 
 variable "ingress_tcp_ports" {
-  description = "Список разрешённых TCP портов (SSH 22 добавляется всегда)"
+  description = "Разрешённые TCP порты (SSH 22 добавляется автоматически)"
   type        = list(number)
   default     = [80, 443]
 }
 
-# --- Профиль ВМ по умолчанию (применяется ко всем, если не переопределить в vms) ---
 variable "platform_id" {
   type    = string
   default = "standard-v3"
 }
-variable "cores"       { type = number, default = 2 }
-variable "memory_gb"   { type = number, default = 2 }
-variable "disk_size_gb"{ type = number, default = 20 }
-variable "preemptible" { type = bool,   default = false }
 
-# Публичный IP: "none" | "ephemeral" | "static"
+variable "cores" {
+  type    = number
+  default = 2
+}
+
+variable "memory_gb" {
+  type    = number
+  default = 2
+}
+
+variable "disk_size_gb" {
+  type    = number
+  default = 20
+}
+
+variable "preemptible" {
+  type    = bool
+  default = false
+}
+
 variable "public_ip_type" {
-  type    = string
-  default = "ephemeral"
+  description = "Тип публичного IP: none | ephemeral | static"
+  type        = string
+  default     = "ephemeral"
   validation {
     condition     = contains(["none", "ephemeral", "static"], var.public_ip_type)
-    error_message = "public_ip_type must be one of: none, ephemeral, static."
+    error_message = "public_ip_type must be: none, ephemeral, or static."
   }
 }
 
-# --- Масштабирование: карта ВМ ---
-# Ключ карты — суффикс имени ВМ (будет vm-<key>)
 variable "vms" {
   description = "Набор ВМ для развертывания"
   type = map(object({
-    cores        = optional(number)
-    memory_gb    = optional(number)
-    disk_size_gb = optional(number)
-    preemptible  = optional(bool)
-    # на всякий случай позволим разный тип IP на ВМ
+    cores          = optional(number)
+    memory_gb      = optional(number)
+    disk_size_gb   = optional(number)
+    preemptible    = optional(bool)
     public_ip_type = optional(string) # none|ephemeral|static
   }))
   default = {

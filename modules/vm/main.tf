@@ -1,13 +1,15 @@
 locals {
-  ssh_pubkey = trim(file(var.ssh_public_key_path))
+  ssh_pubkey = trimspace(file(var.ssh_public_key_path))
   want_nat   = var.public_ip_type != "none"
 }
 
-# Опциональный статический адрес
+# Резерв статического IP в нужной зоне
 resource "yandex_vpc_address" "static" {
   count = var.public_ip_type == "static" ? 1 : 0
   name  = "${var.name}-addr"
-  external_ipv4_address {}
+  external_ipv4_address {
+    zone_id = var.zone
+  }
 }
 
 resource "yandex_compute_instance" "this" {
@@ -33,17 +35,9 @@ resource "yandex_compute_instance" "this" {
   }
 
   network_interface {
-    subnet_id = var.subnet_id
-    nat       = local.want_nat
-
-    # если хотим статический — подставим адрес
-    dynamic "nat_ip_address" {
-      for_each = var.public_ip_type == "static" ? [1] : []
-      content {
-        address = yandex_vpc_address.static[0].external_ipv4_address[0].address
-      }
-    }
-
+    subnet_id          = var.subnet_id
+    nat                = local.want_nat
+    nat_ip_address     = var.public_ip_type == "static" ? yandex_vpc_address.static[0].external_ipv4_address[0].address : null
     security_group_ids = var.sg_ids
   }
 
